@@ -1,0 +1,21 @@
+name: "❓ Help / Question"
+description: "Stuck with a mod, cluster settings, or Coolify configuration? Ask here."
+title: "[HELP]: "
+labels: ["help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: "Don't starve alone! Ask the community or dev for assistance."
+  - type: textarea
+    id: question
+    attributes:
+      label: "What's the struggle?"
+      description: "Tell us what’s going on. Trying to install a specific mod and the server crashed? Shards won't connect?"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Relevant environment configuration or compose snippets"
+      description: "Paste parts of your compose file or environment variables here (HIDE YOUR PASSWORDS AND SERVER TOKENS!)."
+      render: yaml

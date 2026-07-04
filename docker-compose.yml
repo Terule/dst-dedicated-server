@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  master:
+    build: .
+    # If using a pre-built image, you can comment the "build: ." line and uncomment below:
+    # image: ghcr.io/YOUR_GITHUB_USERNAME/dst-dedicated-server:latest
+    container_name: dst-master
+    restart: unless-stopped
+    ports:
+      # Master Game Port (UDP) - players connect here first
+      - "10999:10999/udp"
+    environment:
+      - DST_CLUSTER_TOKEN=your_klei_server_token_here
+      - DST_CLUSTER_NAME=My Dockerized DST Server
+      - DST_CLUSTER_DESC=Multi-container DST server on Coolify!
+      - DST_CLUSTER_PASS=
+      - DST_CLUSTER_INTENTION=cooperative
+      - DST_GAME_MODE=survival
+      - DST_MAX_PLAYERS=6
+      - DST_PVP=false
+      - DST_PAUSE_WHEN_EMPTY=true
+      - DST_VOTE_ENABLED=true
+      - DST_TICK_RATE=30
+      
+      # Shard configuration
+      - DST_SHARD_MODE=Master
+      - DST_CLUSTER_KEY=dst_cluster_secret_key
+      - DST_MASTER_PORT=10888
+      - DST_SERVER_PORT=10999
+      
+      # Mods (comma-separated workshop IDs)
+      # - DST_MODS=345678,987654
+      - DST_AUTO_UPDATE=false
+    volumes:
+      - dst-data:/data
+
+  caves:
+    build: .
+    # If using a pre-built image, you can comment the "build: ." line and uncomment below:
+    # image: ghcr.io/YOUR_GITHUB_USERNAME/dst-dedicated-server:latest
+    container_name: dst-caves
+    restart: unless-stopped
+    depends_on:
+      - master
+    ports:
+      # Caves Game Port (UDP) - players connect here when using sinkholes
+      - "11000:11000/udp"
+    environment:
+      # No need for token or name here, they are read from the shared volume
+      # Shard configuration
+      - DST_SHARD_MODE=Caves
+      - DST_CLUSTER_KEY=dst_cluster_secret_key
+      # Connects to the 'master' service container name on the docker network
+      - DST_MASTER_IP=master
+      - DST_MASTER_PORT=10888
+      # Must match the host port mapped above (11000) so clients can connect
+      - DST_SERVER_PORT=11000
+      
+      # Mods (comma-separated workshop IDs, should match master)
+      # - DST_MODS=345678,987654
+      - DST_AUTO_UPDATE=false
+    volumes:
+      - dst-data:/data
+
+volumes:
+  dst-data:

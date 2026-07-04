@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  dst-server:
+    build: .
+    # If using a pre-built image, you can comment the "build: ." line and uncomment below:
+    # image: ghcr.io/YOUR_GITHUB_USERNAME/dst-dedicated-server:latest
+    container_name: dst-server-single
+    restart: unless-stopped
+    ports:
+      # Master Game Port (UDP) - players connect to this
+      - "10999:10999/udp"
+      # Caves Game Port (UDP) - required if caves are running in the same container
+      - "11000:11000/udp"
+    environment:
+      # REQUIRED: Get your token from https://accounts.klei.com/account/info
+      - DST_CLUSTER_TOKEN=your_klei_server_token_here
+      
+      # Server details
+      - DST_CLUSTER_NAME=My Dockerized DST Server
+      - DST_CLUSTER_DESC=Survival server hosted with Docker on Coolify!
+      - DST_CLUSTER_PASS=
+      - DST_CLUSTER_INTENTION=cooperative
+      - DST_GAME_MODE=survival
+      - DST_MAX_PLAYERS=6
+      - DST_PVP=false
+      - DST_PAUSE_WHEN_EMPTY=true
+      - DST_VOTE_ENABLED=true
+      - DST_TICK_RATE=30
+      
+      # Shard configuration
+      # 'Both' runs Master and Caves processes in this single container.
+      # Use 'Single' if you only want the Surface world (saves memory).
+      - DST_SHARD_MODE=Both
+      - DST_CLUSTER_KEY=dst_cluster_secret_key
+      
+      # Steam Workshop Mods (comma-separated IDs)
+      # - DST_MODS=345678,987654
+      
+      # Set to true to check for game updates on server startup
+      - DST_AUTO_UPDATE=false
+    volumes:
+      # Persists all saves, settings, and generated configs
+      - dst-data:/data
+
+volumes:
+  dst-data:

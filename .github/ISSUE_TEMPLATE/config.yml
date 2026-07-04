@@ -1,0 +1,10 @@
+blank_issues_enabled: false # Forces users to use templates
+
+contact_links:
+  - name: "💬 Community Reddit Thread"
+    url: "https://www.reddit.com/r/dontstarvetogether/"
+    about: "Want to chat with the community or share your stories? Head over to Reddit!"
+
+  - name: "🎮 Klei Support Forums"
+    url: "https://forums.kleientertainment.com/forums/forum/66-dont-starve-together-dedicated-servers/"
+    about: "The official forums for DST Dedicated Server support."

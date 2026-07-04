@@ -61,7 +61,7 @@ In Coolify, you can deploy this server in two different ways depending on your r
 *Ideal for quick setups, lower memory usage, and simple port forwarding.*
 
 1. In Coolify, create a new **Private Application**.
-2. Select your repository (or point to `ghcr.io/YOUR_USERNAME/dst-dedicated-server:latest`).
+2. Select your repository (or point to `ghcr.io/terule/dst-dedicated-server:latest`).
 3. Under the **Ports** settings, map the following UDP ports:
    - `10999:10999/udp` (Master game port)
    - `11000:11000/udp` (Caves game port)

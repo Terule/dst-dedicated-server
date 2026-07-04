@@ -3,6 +3,12 @@ FROM steamcmd/steamcmd:ubuntu-22
 # Prevent prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Metadata Labels
+LABEL maintainer="Terule <https://github.com/Terule>" \
+      org.opencontainers.image.authors="Terule" \
+      org.opencontainers.image.source="https://github.com/Terule/dst-dedicated-server" \
+      org.opencontainers.image.description="Don't Starve Together Dedicated Server by Terule - Docker image with full environment variable configuration"
+
 # Set locale
 RUN apt-get update && apt-get install -y --no-install-recommends locales && \
     sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
@@ -13,7 +19,7 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
 
-# Install dependencies (DST 64-bit and steamcmd 32-bit runtimes)
+# Install additional dependencies for DST (32-bit and 64-bit runtimes)
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -29,32 +35,30 @@ RUN dpkg --add-architecture i386 && \
         libcurl4 \
         procps \
         && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create steam user (Note: ubuntu base image does not have steam user by default)
+# Create steam user
 RUN useradd -m steam
 
-# Pre-create DST server directory with proper ownership
-RUN mkdir -p /opt/dst-server && \
-    chown -R steam:steam /opt/dst-server
+# Fix SteamCMD directories and symlinks to avoid verification loops
+RUN mkdir -p /home/steam/.steam/sdk64 /home/steam/.steam/sdk32 /home/steam/.steam/root /home/steam/Steam/logs && \
+    chown -R steam:steam /home/steam/.steam /home/steam/Steam
 
-# Install DST Server
-USER steam
-RUN steamcmd +force_install_dir /opt/dst-server +login anonymous +app_update 343050 validate +quit
+# Pre-create game and data directories with proper ownership
+RUN mkdir -p /opt/dst-server /data && \
+    chown -R steam:steam /opt/dst-server /data
 
-# Switch back to root to set up script and directory
-USER root
-
-# Create volume dir and set permissions
-RUN mkdir -p /data && chown -R steam:steam /data
 VOLUME /data
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
-RUN sed -i -e 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh && chown steam:steam /entrypoint.sh
+RUN sed -i -e 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-USER steam
-WORKDIR /opt/dst-server
+# Set final permissions
+RUN chown -R steam:steam /home/steam /opt/dst-server /data
+
+WORKDIR /home/steam
 
 EXPOSE 10999/udp 11000/udp 10888/udp
 

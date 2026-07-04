@@ -1,4 +1,4 @@
-FROM debian:12-slim
+FROM steamcmd/steamcmd:ubuntu-22
 
 # Prevent prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -13,7 +13,7 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
 
-# Install dependencies
+# Install dependencies (DST 64-bit and steamcmd 32-bit runtimes)
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -31,23 +31,16 @@ RUN dpkg --add-architecture i386 && \
         && \
     rm -rf /var/lib/apt/lists/*
 
-# Create steam user
-RUN groupadd -g 1000 steam && \
-    useradd -u 1000 -g steam -m steam
+# Create steam user (Note: ubuntu base image does not have steam user by default)
+RUN useradd -m steam
 
-# Download and install SteamCMD
-RUN mkdir -p /opt/steamcmd && \
-    curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - -C /opt/steamcmd && \
-    chown -R steam:steam /opt/steamcmd
-
-# Link steamcmd to standard path and pre-create DST directory with proper ownership
-RUN ln -s /opt/steamcmd/steamcmd.sh /usr/games/steamcmd && \
-    mkdir -p /opt/dst-server && \
+# Pre-create DST server directory with proper ownership
+RUN mkdir -p /opt/dst-server && \
     chown -R steam:steam /opt/dst-server
 
 # Install DST Server
 USER steam
-RUN /usr/games/steamcmd +force_install_dir /opt/dst-server +login anonymous +app_update 343050 validate +quit
+RUN steamcmd +force_install_dir /opt/dst-server +login anonymous +app_update 343050 validate +quit
 
 # Switch back to root to set up script and directory
 USER root

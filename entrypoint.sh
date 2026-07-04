@@ -43,7 +43,7 @@ fi
 # 1. Handle Auto-Update
 if [ "${DST_AUTO_UPDATE}" = "true" ]; then
     echo "Checking for game updates..."
-    /usr/games/steamcmd +force_install_dir /opt/dst-server +login anonymous +app_update 343050 validate +quit
+    steamcmd +force_install_dir /opt/dst-server +login anonymous +app_update 343050 validate +quit
     echo "Update complete."
 fi
 

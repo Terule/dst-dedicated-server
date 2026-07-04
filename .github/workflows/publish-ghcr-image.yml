@@ -33,5 +33,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/terule/${{ github.repository }}:latest
-            ghcr.io/terule/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/terule/dst-dedicated-server:latest
+            ghcr.io/terule/dst-dedicated-server:${{ github.sha }}

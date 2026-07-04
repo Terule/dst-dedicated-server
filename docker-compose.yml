@@ -1,65 +1,70 @@
-version: '3.8'
-
+---
 services:
   master:
     build: .
-    # If using a pre-built image, you can comment the "build: ." line and uncomment below:
-    # image: ghcr.io/YOUR_GITHUB_USERNAME/dst-dedicated-server:latest
+    # If using a pre-built image, comment "build: ." and uncomment below:
+    # image: ghcr.io/terule/dst-dedicated-server:latest
     container_name: dst-master
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
-      # Master Game Port (UDP) - players connect here first
-      - "10999:10999/udp"
+      - "${DST_SERVER_PORT:-10999}:${DST_SERVER_PORT:-10999}/udp"
     environment:
-      - DST_CLUSTER_TOKEN=your_klei_server_token_here
-      - DST_CLUSTER_NAME=My Dockerized DST Server
-      - DST_CLUSTER_DESC=Multi-container DST server on Coolify!
-      - DST_CLUSTER_PASS=
-      - DST_CLUSTER_INTENTION=cooperative
-      - DST_GAME_MODE=survival
-      - DST_MAX_PLAYERS=6
-      - DST_PVP=false
-      - DST_PAUSE_WHEN_EMPTY=true
-      - DST_VOTE_ENABLED=true
-      - DST_TICK_RATE=30
-      
-      # Shard configuration
+      # --- REQUIRED ---
+      - DST_CLUSTER_TOKEN=${DST_CLUSTER_TOKEN:-}
+
+      # --- Server Identity ---
+      - DST_CLUSTER_NAME=${DST_CLUSTER_NAME:-DST Dedicated Server}
+      - DST_CLUSTER_DESC=${DST_CLUSTER_DESC:-Multi-container DST server on Coolify!}
+      - DST_CLUSTER_PASS=${DST_CLUSTER_PASS:-}
+      - DST_CLUSTER_INTENTION=${DST_CLUSTER_INTENTION:-cooperative}
+
+      # --- Gameplay ---
+      - DST_GAME_MODE=${DST_GAME_MODE:-survival}
+      - DST_MAX_PLAYERS=${DST_MAX_PLAYERS:-6}
+      - DST_PVP=${DST_PVP:-false}
+      - DST_PAUSE_WHEN_EMPTY=${DST_PAUSE_WHEN_EMPTY:-true}
+      - DST_VOTE_ENABLED=${DST_VOTE_ENABLED:-true}
+      - DST_TICK_RATE=${DST_TICK_RATE:-30}
+
+      # --- Shard Configuration ---
       - DST_SHARD_MODE=Master
-      - DST_CLUSTER_KEY=dst_cluster_secret_key
-      - DST_MASTER_PORT=10888
-      - DST_SERVER_PORT=10999
-      
-      # Mods (comma-separated workshop IDs)
-      # - DST_MODS=345678,987654
-      - DST_AUTO_UPDATE=false
+      - DST_CLUSTER_KEY=${DST_CLUSTER_KEY:-dst_cluster_secret_key}
+      - DST_MASTER_PORT=${DST_MASTER_PORT:-10888}
+      - DST_SERVER_PORT=${DST_SERVER_PORT:-10999}
+
+      # --- Steam Workshop Mods (comma-separated IDs) ---
+      - DST_MODS=${DST_MODS:-}
+
+      # --- Maintenance ---
+      - DST_AUTO_UPDATE=${DST_AUTO_UPDATE:-true}
     volumes:
       - dst-data:/data
 
   caves:
     build: .
-    # If using a pre-built image, you can comment the "build: ." line and uncomment below:
-    # image: ghcr.io/YOUR_GITHUB_USERNAME/dst-dedicated-server:latest
+    # If using a pre-built image, comment "build: ." and uncomment below:
+    # image: ghcr.io/terule/dst-dedicated-server:latest
     container_name: dst-caves
     restart: unless-stopped
+    stop_grace_period: 30s
     depends_on:
       - master
     ports:
-      # Caves Game Port (UDP) - players connect here when using sinkholes
-      - "11000:11000/udp"
+      - "${DST_CAVES_PORT:-11000}:${DST_CAVES_PORT:-11000}/udp"
     environment:
-      # No need for token or name here, they are read from the shared volume
-      # Shard configuration
+      # --- Shard Configuration ---
       - DST_SHARD_MODE=Caves
-      - DST_CLUSTER_KEY=dst_cluster_secret_key
-      # Connects to the 'master' service container name on the docker network
+      - DST_CLUSTER_KEY=${DST_CLUSTER_KEY:-dst_cluster_secret_key}
       - DST_MASTER_IP=master
-      - DST_MASTER_PORT=10888
-      # Must match the host port mapped above (11000) so clients can connect
-      - DST_SERVER_PORT=11000
-      
-      # Mods (comma-separated workshop IDs, should match master)
-      # - DST_MODS=345678,987654
-      - DST_AUTO_UPDATE=false
+      - DST_MASTER_PORT=${DST_MASTER_PORT:-10888}
+      - DST_SERVER_PORT=${DST_CAVES_PORT:-11000}
+
+      # --- Steam Workshop Mods (must match master) ---
+      - DST_MODS=${DST_MODS:-}
+
+      # --- Maintenance ---
+      - DST_AUTO_UPDATE=${DST_AUTO_UPDATE:-true}
     volumes:
       - dst-data:/data
 

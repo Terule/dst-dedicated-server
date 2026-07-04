@@ -40,13 +40,14 @@ RUN mkdir -p /opt/steamcmd && \
     curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - -C /opt/steamcmd && \
     chown -R steam:steam /opt/steamcmd
 
-# Link steamcmd to standard path
-RUN ln -s /opt/steamcmd/steamcmd.sh /usr/games/steamcmd
+# Link steamcmd to standard path and pre-create DST directory with proper ownership
+RUN ln -s /opt/steamcmd/steamcmd.sh /usr/games/steamcmd && \
+    mkdir -p /opt/dst-server && \
+    chown -R steam:steam /opt/dst-server
 
 # Install DST Server
 USER steam
-RUN mkdir -p /opt/dst-server && \
-    /usr/games/steamcmd +force_install_dir /opt/dst-server +login anonymous +app_update 343050 validate +quit
+RUN /usr/games/steamcmd +force_install_dir /opt/dst-server +login anonymous +app_update 343050 validate +quit
 
 # Switch back to root to set up script and directory
 USER root

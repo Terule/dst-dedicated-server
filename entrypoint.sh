@@ -158,12 +158,12 @@ setup_mods() {
         # Trim whitespace
         mod_id="$(echo "${mod_id}" | tr -d '[:space:]')"
         if [ -n "${mod_id}" ]; then
-            echo "ServerModSetup(\"${mod_id}\")" >> "${mod_setup_file}"
+            echo 'ServerModSetup("'"${mod_id}"'")' >> "${mod_setup_file}"
 
             # Only add if modoverrides was just created (no .bak marker)
             if [ ! -f "${CLUSTER_PATH}/${shard_dir}/modoverrides.lua.bak" ]; then
                 if ! grep -q "workshop-${mod_id}" "${mod_override_file}" 2>/dev/null; then
-                    echo "  [\"workshop-${mod_id}\"] = { enabled = true }," >> "${mod_override_file}"
+                    echo '  ["workshop-'"${mod_id}"'"] = { enabled = true },' >> "${mod_override_file}"
                 fi
             fi
         fi

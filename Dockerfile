@@ -29,6 +29,9 @@ RUN dpkg --add-architecture i386 && \
         lib32gcc-s1 \
         lib32stdc++6 \
         libcurl4-gnutls-dev:i386 \
+        libcurl4-gnutls-dev \
+        libcurl3-gnutls \
+        libcurl3-gnutls:i386 \
         libstdc++6 \
         libsqlite3-0 \
         libsqlite3-0:i386 \
@@ -61,5 +64,9 @@ RUN chown -R steam:steam /home/steam /opt/dst-server /data
 WORKDIR /home/steam
 
 EXPOSE 10999/udp 11000/udp 10888/udp
+
+# Health Check
+HEALTHCHECK --interval=1m --timeout=10s --start-period=5m --retries=3 \
+    CMD pgrep "dontstarve" > /dev/null || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

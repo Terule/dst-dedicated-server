@@ -1,9 +1,7 @@
 ---
 services:
   master:
-    build: .
-    # If using a pre-built image, comment "build: ." and uncomment below:
-    # image: ghcr.io/terule/dst-dedicated-server:latest
+    image: terule/dst-dedicated-server:latest
     container_name: dst-master
     restart: unless-stopped
     stop_grace_period: 30s
@@ -42,9 +40,7 @@ services:
       - dst-data:/data
 
   caves:
-    build: .
-    # If using a pre-built image, comment "build: ." and uncomment below:
-    # image: ghcr.io/terule/dst-dedicated-server:latest
+    image: terule/dst-dedicated-server:latest
     container_name: dst-caves
     restart: unless-stopped
     stop_grace_period: 30s

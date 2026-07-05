@@ -1,9 +1,7 @@
 ---
 services:
   dst-server:
-    build: .
-    # If using a pre-built image, comment "build: ." and uncomment below:
-    # image: ghcr.io/terule/dst-dedicated-server:latest
+    image: terule/dst-dedicated-server:latest
     container_name: dst-server
     restart: unless-stopped
     stop_grace_period: 30s

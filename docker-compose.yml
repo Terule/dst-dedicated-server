@@ -49,6 +49,23 @@ services:
     ports:
       - "${DST_CAVES_PORT:-11000}:${DST_CAVES_PORT:-11000}/udp"
     environment:
+      # --- REQUIRED ---
+      - DST_CLUSTER_TOKEN=${DST_CLUSTER_TOKEN:-}
+
+      # --- Server Identity ---
+      - DST_CLUSTER_NAME=${DST_CLUSTER_NAME:-DST Dedicated Server}
+      - DST_CLUSTER_DESC=${DST_CLUSTER_DESC:-Multi-container DST server on Coolify!}
+      - DST_CLUSTER_PASS=${DST_CLUSTER_PASS:-}
+      - DST_CLUSTER_INTENTION=${DST_CLUSTER_INTENTION:-cooperative}
+
+      # --- Gameplay ---
+      - DST_GAME_MODE=${DST_GAME_MODE:-survival}
+      - DST_MAX_PLAYERS=${DST_MAX_PLAYERS:-6}
+      - DST_PVP=${DST_PVP:-false}
+      - DST_PAUSE_WHEN_EMPTY=${DST_PAUSE_WHEN_EMPTY:-true}
+      - DST_VOTE_ENABLED=${DST_VOTE_ENABLED:-true}
+      - DST_TICK_RATE=${DST_TICK_RATE:-30}
+
       # --- Shard Configuration ---
       - DST_SHARD_MODE=Caves
       - DST_CLUSTER_KEY=${DST_CLUSTER_KEY:-dst_cluster_secret_key}

@@ -1,12 +1,20 @@
 #!/bin/bash
-set -e
 
 # ============================================
 # DST Dedicated Server - Docker Entrypoint
+# Developed by Terule
 # ============================================
+
+# --- Log Helpers ---
+LogAction() { echo "==== $1 ===="; }
+LogSuccess() { echo "[OK] $1"; }
+LogWarn() { echo "[WARN] $1"; }
+LogError() { echo "[ERROR] $1"; }
 
 STEAMCMD_PATH="${STEAMCMD_PATH:-/usr/bin/steamcmd}"
 INSTALL_DIR="/opt/dst-server"
+DST_BIN="${INSTALL_DIR}/bin64"
+DST_BINARY="dontstarve_dedicated_server_nullrenderer_x64"
 
 # Define data directory structure
 DATA_DIR="/data"
@@ -25,7 +33,7 @@ PVP="${DST_PVP:-false}"
 PAUSE_WHEN_EMPTY="${DST_PAUSE_WHEN_EMPTY:-true}"
 VOTE_ENABLED="${DST_VOTE_ENABLED:-true}"
 TICK_RATE="${DST_TICK_RATE:-30}"
-SHARD_MODE="${DST_SHARD_MODE:-Single}" # Options: Single, Master, Caves, Both
+SHARD_MODE="${DST_SHARD_MODE:-Single}"
 CLUSTER_KEY="${DST_CLUSTER_KEY:-dst_cluster_key}"
 MASTER_IP="${DST_MASTER_IP:-127.0.0.1}"
 MASTER_PORT="${DST_MASTER_PORT:-10888}"
@@ -35,50 +43,56 @@ CAVES_PORT="${DST_CAVES_PORT:-11000}"
 echo "============================================="
 echo " Don't Starve Together - Dedicated Server"
 echo "============================================="
-echo "SHARD_MODE: ${SHARD_MODE}"
-echo "CLUSTER_PATH: ${CLUSTER_PATH}"
+echo " SHARD_MODE:    ${SHARD_MODE}"
+echo " CLUSTER_PATH:  ${CLUSTER_PATH}"
 echo "============================================="
 
 # --- 0. Ensure directories exist and have correct ownership ---
+LogAction "Preparing directories"
 mkdir -p "${INSTALL_DIR}" "${DATA_DIR}" "${CLUSTER_PATH}/Master" "${CLUSTER_PATH}/Caves"
 mkdir -p /home/steam/.steam/sdk64 /home/steam/.steam/sdk32 /home/steam/.steam/root /home/steam/Steam/logs
 chown -R steam:steam /home/steam "${INSTALL_DIR}" "${DATA_DIR}"
 
 # --- 1. Install / Update Game via SteamCMD ---
-# Game is downloaded at first startup (or updated if DST_AUTO_UPDATE=true)
-# This runs as the steam user to avoid permission issues
-if [ "${DST_AUTO_UPDATE}" = "true" ] || [ ! -f "${INSTALL_DIR}/bin64/dontstarve_dedicated_server_nullrenderer_x64" ]; then
-    echo "Installing/Updating DST Dedicated Server files..."
+if [ "${DST_AUTO_UPDATE}" = "true" ] || [ ! -f "${DST_BIN}/${DST_BINARY}" ]; then
+    LogAction "Installing/Updating DST Dedicated Server"
 
     RETRY_COUNT=0
     MAX_RETRIES=5
 
     while true; do
         if su steam -s /bin/bash -c "${STEAMCMD_PATH} +force_install_dir ${INSTALL_DIR} +login anonymous +app_update 343050 validate +quit"; then
-            echo "Game install/update successful!"
+            LogSuccess "Game install/update successful!"
             break
         else
             RETRY_COUNT=$((RETRY_COUNT + 1))
             if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-                echo "ERROR: SteamCMD failed after ${MAX_RETRIES} attempts. Exiting."
+                LogError "SteamCMD failed after ${MAX_RETRIES} attempts. Exiting."
                 exit 1
             fi
-            echo "SteamCMD failed (Attempt ${RETRY_COUNT}/${MAX_RETRIES}). Retrying in 10 seconds..."
+            LogWarn "SteamCMD failed (Attempt ${RETRY_COUNT}/${MAX_RETRIES}). Retrying in 10 seconds..."
             sleep 10
         fi
     done
+
+    # Ensure game files are owned by steam after install/update
+    chown -R steam:steam "${INSTALL_DIR}"
 fi
 
-# Ensure game files are owned by steam after install/update
-chown -R steam:steam "${INSTALL_DIR}"
+# Verify the game binary exists before proceeding
+if [ ! -f "${DST_BIN}/${DST_BINARY}" ]; then
+    LogError "Game binary not found at ${DST_BIN}/${DST_BINARY}"
+    LogError "SteamCMD may have failed to download the game files."
+    exit 1
+fi
 
 # --- 2. Handle Cluster Token ---
 if [ -n "${DST_CLUSTER_TOKEN}" ]; then
-    echo "Writing cluster token..."
+    LogAction "Writing cluster token"
     echo "${DST_CLUSTER_TOKEN}" > "${CLUSTER_PATH}/cluster_token.txt"
 elif [ ! -f "${CLUSTER_PATH}/cluster_token.txt" ]; then
-    echo "WARNING: DST_CLUSTER_TOKEN is not set and no cluster_token.txt exists!"
-    echo "The server will not be able to authenticate with Klei servers."
+    LogWarn "DST_CLUSTER_TOKEN is not set and no cluster_token.txt exists!"
+    LogWarn "The server will not be able to authenticate with Klei servers."
 fi
 
 # --- 3. Generate cluster.ini ---
@@ -87,8 +101,8 @@ if [ "${SHARD_MODE}" != "Single" ]; then
     SHARD_ENABLED="true"
 fi
 
-echo "Generating cluster.ini..."
-cat <<EOF > "${CLUSTER_PATH}/cluster.ini"
+LogAction "Generating cluster.ini"
+cat > "${CLUSTER_PATH}/cluster.ini" << CLUSTER_EOF
 [GAMEPLAY]
 game_mode = ${GAME_MODE}
 max_players = ${MAX_PLAYERS}
@@ -113,56 +127,60 @@ bind_ip = 0.0.0.0
 master_ip = ${MASTER_IP}
 master_port = ${MASTER_PORT}
 cluster_key = ${CLUSTER_KEY}
-EOF
+CLUSTER_EOF
 
 # --- 4. Helper function to generate mod files ---
 setup_mods() {
-    local shard_dir=$1
-    if [ -n "${DST_MODS}" ]; then
-        echo "Setting up mods for ${shard_dir}..."
+    local shard_dir="$1"
 
-        # Write/Update download setup (global to game installation)
-        local mod_setup_file="${INSTALL_DIR}/mods/dedicated_server_mods_setup.lua"
-        echo "-- Generated by Docker entrypoint on startup" > "$mod_setup_file"
+    # Skip if no mods configured
+    if [ -z "${DST_MODS}" ]; then
+        return 0
+    fi
 
-        # Write enable setup (per-shard folder)
-        local mod_override_file="${CLUSTER_PATH}/${shard_dir}/modoverrides.lua"
+    LogAction "Setting up mods for ${shard_dir}"
 
-        if [ ! -f "$mod_override_file" ]; then
-            echo "-- Generated by Docker entrypoint on startup" > "$mod_override_file"
-            echo "return {" >> "$mod_override_file"
-        fi
+    # Write download setup (global to game installation)
+    local mod_setup_file="${INSTALL_DIR}/mods/dedicated_server_mods_setup.lua"
+    echo "-- Generated by Docker entrypoint on startup" > "${mod_setup_file}"
 
-        # Split mods and iterate
-        IFS=',' read -ra MOD_IDS <<< "${DST_MODS}"
-        for mod_id in "${MOD_IDS[@]}"; do
-            # Trim whitespace
-            mod_id=$(echo "${mod_id}" | xargs)
-            if [ -n "${mod_id}" ]; then
-                echo "ServerModSetup(\"${mod_id}\")" >> "$mod_setup_file"
+    # Write enable setup (per-shard folder)
+    local mod_override_file="${CLUSTER_PATH}/${shard_dir}/modoverrides.lua"
 
-                # Only add if we're creating modoverrides for the first time
-                if [ ! -f "${CLUSTER_PATH}/${shard_dir}/modoverrides.lua.bak" ]; then
-                    if ! grep -q "workshop-${mod_id}" "$mod_override_file" 2>/dev/null; then
-                        echo "  [\"workshop-${mod_id}\"] = { enabled = true }," >> "$mod_override_file"
-                    fi
+    if [ ! -f "${mod_override_file}" ]; then
+        echo "-- Generated by Docker entrypoint on startup" > "${mod_override_file}"
+        echo "return {" >> "${mod_override_file}"
+    fi
+
+    # Split mods and iterate
+    local IFS=','
+    for mod_id in ${DST_MODS}; do
+        # Trim whitespace
+        mod_id="$(echo "${mod_id}" | tr -d '[:space:]')"
+        if [ -n "${mod_id}" ]; then
+            echo "ServerModSetup(\"${mod_id}\")" >> "${mod_setup_file}"
+
+            # Only add if modoverrides was just created (no .bak marker)
+            if [ ! -f "${CLUSTER_PATH}/${shard_dir}/modoverrides.lua.bak" ]; then
+                if ! grep -q "workshop-${mod_id}" "${mod_override_file}" 2>/dev/null; then
+                    echo "  [\"workshop-${mod_id}\"] = { enabled = true }," >> "${mod_override_file}"
                 fi
             fi
-        done
-
-        if [ ! -f "${CLUSTER_PATH}/${shard_dir}/modoverrides.lua.bak" ]; then
-            echo "}" >> "$mod_override_file"
-            # Create marker to prevent overwriting on next boot
-            touch "${CLUSTER_PATH}/${shard_dir}/modoverrides.lua.bak"
         fi
+    done
+
+    if [ ! -f "${CLUSTER_PATH}/${shard_dir}/modoverrides.lua.bak" ]; then
+        echo "}" >> "${mod_override_file}"
+        # Create marker to prevent overwriting on next boot
+        touch "${CLUSTER_PATH}/${shard_dir}/modoverrides.lua.bak"
     fi
 }
 
 # --- 5. Generate Shard server.ini and worldgenoverride.lua ---
 # Master configuration
 if [ "${SHARD_MODE}" = "Master" ] || [ "${SHARD_MODE}" = "Both" ] || [ "${SHARD_MODE}" = "Single" ]; then
-    echo "Generating Master/server.ini..."
-    cat <<EOF > "${CLUSTER_PATH}/Master/server.ini"
+    LogAction "Generating Master/server.ini"
+    cat > "${CLUSTER_PATH}/Master/server.ini" << MASTER_EOF
 [SHARD]
 is_master = true
 name = Master
@@ -174,24 +192,24 @@ authentication_port = 8768
 
 [NETWORK]
 server_port = ${SERVER_PORT}
-EOF
+MASTER_EOF
 
     # Default worldgen for master (only if not already customized)
     if [ ! -f "${CLUSTER_PATH}/Master/worldgenoverride.lua" ]; then
-        echo "Creating default Master/worldgenoverride.lua..."
-        cat <<EOF > "${CLUSTER_PATH}/Master/worldgenoverride.lua"
+        LogAction "Creating default Master/worldgenoverride.lua"
+        cat > "${CLUSTER_PATH}/Master/worldgenoverride.lua" << WORLDGEN_MASTER_EOF
 return {
   override_enabled = true,
   preset = "SURVIVAL_TOGETHER",
 }
-EOF
+WORLDGEN_MASTER_EOF
     fi
     setup_mods "Master"
 fi
 
 # Caves configuration
 if [ "${SHARD_MODE}" = "Caves" ] || [ "${SHARD_MODE}" = "Both" ]; then
-    echo "Generating Caves/server.ini..."
+    LogAction "Generating Caves/server.ini"
 
     # Avoid port collision with Master if running in the same container (Both mode)
     caves_master_port=27018
@@ -204,7 +222,7 @@ if [ "${SHARD_MODE}" = "Caves" ] || [ "${SHARD_MODE}" = "Both" ]; then
         caves_srv_port=${CAVES_PORT}
     fi
 
-    cat <<EOF > "${CLUSTER_PATH}/Caves/server.ini"
+    cat > "${CLUSTER_PATH}/Caves/server.ini" << CAVES_EOF
 [SHARD]
 is_master = false
 name = Caves
@@ -216,17 +234,17 @@ authentication_port = ${caves_auth_port}
 
 [NETWORK]
 server_port = ${caves_srv_port}
-EOF
+CAVES_EOF
 
     # Default worldgen for caves (only if not already customized)
     if [ ! -f "${CLUSTER_PATH}/Caves/worldgenoverride.lua" ]; then
-        echo "Creating default Caves/worldgenoverride.lua..."
-        cat <<EOF > "${CLUSTER_PATH}/Caves/worldgenoverride.lua"
+        LogAction "Creating default Caves/worldgenoverride.lua"
+        cat > "${CLUSTER_PATH}/Caves/worldgenoverride.lua" << WORLDGEN_CAVES_EOF
 return {
   override_enabled = true,
   preset = "DST_CAVE",
 }
-EOF
+WORLDGEN_CAVES_EOF
     fi
     setup_mods "Caves"
 fi
@@ -239,85 +257,56 @@ master_pid=""
 caves_pid=""
 
 cleanup() {
-    echo "Received shutdown signal. Stopping DST Server processes gracefully..."
-    if [ -n "$master_pid" ]; then
-        echo "Stopping Master shard (PID: $master_pid)..."
-        kill -SIGTERM "$master_pid" 2>/dev/null
+    echo ""
+    LogAction "Received shutdown signal. Stopping DST Server gracefully"
+    if [ -n "${master_pid}" ]; then
+        LogAction "Stopping Master shard (PID: ${master_pid})"
+        kill -SIGTERM "${master_pid}" 2>/dev/null
     fi
-    if [ -n "$caves_pid" ]; then
-        echo "Stopping Caves shard (PID: $caves_pid)..."
-        kill -SIGTERM "$caves_pid" 2>/dev/null
+    if [ -n "${caves_pid}" ]; then
+        LogAction "Stopping Caves shard (PID: ${caves_pid})"
+        kill -SIGTERM "${caves_pid}" 2>/dev/null
     fi
 
     # Wait for processes to exit (DST server saves world on SIGTERM)
-    [ -n "$master_pid" ] && wait "$master_pid" 2>/dev/null
-    [ -n "$caves_pid" ] && wait "$caves_pid" 2>/dev/null
-    echo "Server processes stopped. Safe to exit container."
+    [ -n "${master_pid}" ] && wait "${master_pid}" 2>/dev/null
+    [ -n "${caves_pid}" ] && wait "${caves_pid}" 2>/dev/null
+    LogSuccess "Server processes stopped. Safe to exit container."
     exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
-# --- Run the server as the steam user ---
-DST_BIN="${INSTALL_DIR}/bin64"
+# --- 7. Start DST Server ---
+LogAction "Starting DST Server (Mode: ${SHARD_MODE})"
 
 if [ "${SHARD_MODE}" = "Single" ]; then
-    echo "Starting Master server (shard communication disabled)..."
-    su steam -s /bin/bash -c "${DST_BIN}/dontstarve_dedicated_server_nullrenderer_x64 \
-        -console \
-        -persistent_storage_root ${DATA_DIR} \
-        -conf_dir ${CONF_DIR} \
-        -cluster ${CLUSTER_DIR} \
-        -shard Master" &
+    su steam -s /bin/bash -c "cd ${DST_BIN} && ./${DST_BINARY} -console -persistent_storage_root ${DATA_DIR} -conf_dir ${CONF_DIR} -cluster ${CLUSTER_DIR} -shard Master" &
     master_pid=$!
-    wait "$master_pid"
+    wait "${master_pid}"
 
 elif [ "${SHARD_MODE}" = "Master" ]; then
-    echo "Starting Master shard..."
-    su steam -s /bin/bash -c "${DST_BIN}/dontstarve_dedicated_server_nullrenderer_x64 \
-        -console \
-        -persistent_storage_root ${DATA_DIR} \
-        -conf_dir ${CONF_DIR} \
-        -cluster ${CLUSTER_DIR} \
-        -shard Master" &
+    su steam -s /bin/bash -c "cd ${DST_BIN} && ./${DST_BINARY} -console -persistent_storage_root ${DATA_DIR} -conf_dir ${CONF_DIR} -cluster ${CLUSTER_DIR} -shard Master" &
     master_pid=$!
-    wait "$master_pid"
+    wait "${master_pid}"
 
 elif [ "${SHARD_MODE}" = "Caves" ]; then
-    echo "Starting Caves shard..."
-    su steam -s /bin/bash -c "${DST_BIN}/dontstarve_dedicated_server_nullrenderer_x64 \
-        -console \
-        -persistent_storage_root ${DATA_DIR} \
-        -conf_dir ${CONF_DIR} \
-        -cluster ${CLUSTER_DIR} \
-        -shard Caves" &
+    su steam -s /bin/bash -c "cd ${DST_BIN} && ./${DST_BINARY} -console -persistent_storage_root ${DATA_DIR} -conf_dir ${CONF_DIR} -cluster ${CLUSTER_DIR} -shard Caves" &
     caves_pid=$!
-    wait "$caves_pid"
+    wait "${caves_pid}"
 
 elif [ "${SHARD_MODE}" = "Both" ]; then
-    echo "Starting both Master and Caves shards inside this container..."
-
-    echo "Launching Master shard..."
-    su steam -s /bin/bash -c "${DST_BIN}/dontstarve_dedicated_server_nullrenderer_x64 \
-        -console \
-        -persistent_storage_root ${DATA_DIR} \
-        -conf_dir ${CONF_DIR} \
-        -cluster ${CLUSTER_DIR} \
-        -shard Master" &
+    LogAction "Launching Master shard"
+    su steam -s /bin/bash -c "cd ${DST_BIN} && ./${DST_BINARY} -console -persistent_storage_root ${DATA_DIR} -conf_dir ${CONF_DIR} -cluster ${CLUSTER_DIR} -shard Master" &
     master_pid=$!
 
-    echo "Waiting 15 seconds before starting Caves shard to let Master initialize..."
+    LogAction "Waiting 15 seconds for Master to initialize"
     sleep 15
 
-    echo "Launching Caves shard..."
-    su steam -s /bin/bash -c "${DST_BIN}/dontstarve_dedicated_server_nullrenderer_x64 \
-        -console \
-        -persistent_storage_root ${DATA_DIR} \
-        -conf_dir ${CONF_DIR} \
-        -cluster ${CLUSTER_DIR} \
-        -shard Caves" &
+    LogAction "Launching Caves shard"
+    su steam -s /bin/bash -c "cd ${DST_BIN} && ./${DST_BINARY} -console -persistent_storage_root ${DATA_DIR} -conf_dir ${CONF_DIR} -cluster ${CLUSTER_DIR} -shard Caves" &
     caves_pid=$!
 
     # Wait for both background processes
-    wait "$master_pid" "$caves_pid"
+    wait "${master_pid}" "${caves_pid}"
 fi

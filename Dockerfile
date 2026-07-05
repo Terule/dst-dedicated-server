@@ -53,7 +53,7 @@ VOLUME /data
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
-RUN sed -i -e 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+RUN sed -i -e 's/\r//g' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Set final permissions
 RUN chown -R steam:steam /home/steam /opt/dst-server /data

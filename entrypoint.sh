@@ -24,7 +24,7 @@ CLUSTER_PATH="${DATA_DIR}/${CONF_DIR}/${CLUSTER_DIR}"
 
 # Set default values for env vars
 CLUSTER_NAME="${DST_CLUSTER_NAME:-DST Dedicated Server}"
-CLUSTER_DESC="${DST_CLUSTER_DESC:-A Don't Starve Together server running on Docker}"
+CLUSTER_DESC="${DST_CLUSTER_DESC:-A Dont Starve Together server running on Docker}"
 CLUSTER_PASS="${DST_CLUSTER_PASS:-}"
 CLUSTER_INTENTION="${DST_CLUSTER_INTENTION:-cooperative}"
 GAME_MODE="${DST_GAME_MODE:-survival}"
@@ -168,7 +168,8 @@ setup_mods() {
         fi
     done
 
-    if [ "${created_new}" = "true" ]; then
+    if [ "${created_new}" = "true" ];
+    then
         echo "}" >> "${mod_override_file}"
     fi
 }

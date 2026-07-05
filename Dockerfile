@@ -28,8 +28,6 @@ RUN dpkg --add-architecture i386 && \
         wget \
         lib32gcc-s1 \
         lib32stdc++6 \
-        libcurl4-gnutls-dev:i386 \
-        libcurl4-gnutls-dev \
         libcurl3-gnutls \
         libcurl3-gnutls:i386 \
         libstdc++6 \
